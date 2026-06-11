@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>《自然的盾》My Knife Shield｜3D 互動模型</title>
+<style>
+  :root{
+    --bg:#161d14;
+    --ink:#e8e2d2;
+    --ink-dim:#a9a392;
+    --accent:#c98a3d;
+    --panel:rgba(22,29,20,.82);
+    --line:rgba(232,226,210,.18);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:var(--bg);
+    font-family:"Noto Serif TC","Songti TC","PMingLiU",serif;color:var(--ink)}
+  #stage{position:fixed;inset:0}
+  canvas{display:block}
+
+  .hud{position:fixed;z-index:10;pointer-events:none}
+  .hud > *{pointer-events:auto}
+
+  #title{top:24px;left:26px;max-width:300px}
+  #title .eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:11px;
+    letter-spacing:.22em;color:var(--accent);text-transform:uppercase;margin-bottom:8px}
+  #title h1{font-size:30px;font-weight:700;letter-spacing:.08em;line-height:1.25}
+  #title .sub{margin-top:6px;font-size:13px;color:var(--ink-dim);letter-spacing:.06em}
+
+  #controls{bottom:24px;left:26px;display:flex;gap:10px;flex-wrap:wrap}
+  .btn{font-family:inherit;font-size:13px;letter-spacing:.1em;color:var(--ink);
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;
+    padding:9px 18px;cursor:pointer;backdrop-filter:blur(6px);transition:border-color .2s,color .2s}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.on{border-color:var(--accent);color:var(--accent)}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  #hint{bottom:28px;right:26px;font-size:12px;color:var(--ink-dim);letter-spacing:.08em;text-align:right;line-height:1.8}
+
+  #card{top:24px;right:26px;width:300px;background:var(--panel);border:1px solid var(--line);
+    border-radius:4px;padding:20px 22px;backdrop-filter:blur(8px);display:none}
+  #card.show{display:block}
+  #card h2{font-size:16px;letter-spacing:.12em;margin-bottom:4px}
+  #card .en{font-family:Georgia,serif;font-style:italic;font-size:12px;color:var(--accent);margin-bottom:12px}
+  #card p{font-size:13px;line-height:1.9;color:var(--ink)}
+  #card p.en-body{font-family:Georgia,serif;font-size:11.5px;color:var(--ink-dim);margin-top:10px;line-height:1.7}
+  #card .team{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
+    font-size:12px;color:var(--ink-dim);letter-spacing:.08em}
+
+  @media (max-width:640px){
+    #title h1{font-size:22px}
+    #card{width:calc(100vw - 52px);top:auto;bottom:84px;right:26px}
+    #hint{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){.btn{transition:none}}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div class="hud" id="title">
+  <div class="eyebrow">My Knife Shield · 數位 3D 版</div>
+  <h1>《自然的刀盾》</h1>
+  <div class="sub">Knife &amp; Shield of Nature — 以虛擬自然素材拼成之刀與盾</div>
+</div>
+
+<div class="hud" id="card">
+  <h2>作品理念</h2>
+  <div class="en">Concept</div>
+  <p>以校園可見的自然素材——落葉、細枝、石礫與種子——拼貼成盾；旁列以燧石、樹枝、麻繩組成相伴之刀。刀與盾並列，象徵自然同時是守護生命的盾，也是生存所用的工具。</p>
+  <p class="en-body">A shield and an accompanying knife, both assembled from natural materials. Nature is at once the protector and the tool of survival — leaf and stone, twig and bone.</p>
+  <div class="team">隊員｜曾筠翔・胡澤宇・羅盛揚</div>
+</div>
+
+<div class="hud" id="controls">
+  <button class="btn on" id="btnSpin">自動旋轉</button>
+  <button class="btn" id="btnExplode">分層檢視</button>
+  <button class="btn" id="btnCard">說明卡</button>
+  <button class="btn" id="btnReset">重置視角</button>
+</div>
+
+<div class="hud" id="hint">拖曳旋轉 · 滾輪縮放<br>手機可雙指縮放</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  var stage = document.getElementById('stage');
+  var W = window.innerWidth, H = window.innerHeight;
+
+  var renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(W, H);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  stage.appendChild(renderer.domElement);
+
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x161d14);
+  scene.fog = new THREE.Fog(0x161d14, 14, 30);
+
+  var camera = new THREE.PerspectiveCamera(40, W/H, 0.1, 100);
+  var camDist = 11.8;
+  camera.position.set(0, 0, camDist);
+
+  // ---------- 燈光：雨後林間的柔光 ----------
+  scene.add(new THREE.HemisphereLight(0x9db48a, 0x3a2e22, 0.55));
+  var key = new THREE.DirectionalLight(0xffe8c4, 1.0);
+  key.position.set(4, 6, 7);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.camera.left = -6; key.shadow.camera.right = 6;
+  key.shadow.camera.top = 6;   key.shadow.camera.bottom = -6;
+  scene.add(key);
+  var fill = new THREE.DirectionalLight(0x8aa0c0, 0.25);
+  fill.position.set(-5, -2, 4);
+  scene.add(fill);
+
+  // ---------- 共用工具 ----------
+  function rand(a, b){ return a + Math.random()*(b-a); }
+  function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+  // 盾牌輪廓：頂部寬、底部收尖（heater shield）
+  var SH = 5.2, SW = 4.2, TOP = SH/2;
+  function halfWidth(y){
+    var u = (TOP - y) / SH;            // 0 = 頂, 1 = 底
+    if(u < 0 || u > 1) return 0;
+    return (SW/2) * Math.pow(Math.cos(u * Math.PI/2), 0.62);
+  }
+  function inside(x, y, margin){
+    var hw = halfWidth(y) - (margin||0);
+    return hw > 0 && Math.abs(x) < hw && y < TOP - (margin||0);
+  }
+
+  // ---------- 主群組與展示佈局 ----------
+  var pivot = new THREE.Group();   // 拖曳旋轉用
+  scene.add(pivot);
+  var baseGroup   = new THREE.Group();
+  var leafGroup   = new THREE.Group();
+  var centerGroup = new THREE.Group();
+  var frameGroup  = new THREE.Group();
+  var shieldAssembly = new THREE.Group();
+  shieldAssembly.add(baseGroup, leafGroup, centerGroup, frameGroup);
+  shieldAssembly.position.x = -1.0;   // 盾牌往左讓位給右側陳列的刀
+  pivot.add(shieldAssembly);
+  var knifeGroup = new THREE.Group();
+  knifeGroup.position.set(2.4, 0, 0.2);
+  pivot.add(knifeGroup);
+
+  // ---------- 1. 厚紙板底板 ----------
+  var outlinePts = [];
+  (function(){
+    var steps = 64, i, y, hw;
+    for(i = 0; i <= steps; i++){            // 右側：上到下
+      y = TOP - (SH * i / steps);
+      hw = halfWidth(y);
+      outlinePts.push(new THREE.Vector2(hw, y));
+    }
+    for(i = steps; i >= 0; i--){            // 左側：下到上
+      y = TOP - (SH * i / steps);
+      hw = halfWidth(y);
+      outlinePts.push(new THREE.Vector2(-hw, y));
+    }
+  })();
+  var shieldShape = new THREE.Shape(outlinePts);
+  var boardGeo = new THREE.ExtrudeGeometry(shieldShape, {depth:0.14, bevelEnabled:true, bevelThickness:0.02, bevelSize:0.02, bevelSegments:1});
+  var boardMat = new THREE.MeshStandardMaterial({color:0x9a7a50, roughness:0.95, metalness:0});
+  var board = new THREE.Mesh(boardGeo, boardMat);
+  board.position.z = -0.14;
+  board.castShadow = true; board.receiveShadow = true;
+  baseGroup.add(board);
+
+  // ---------- 2. 葉片馬賽克（分區配色） ----------
+  // 六個角度分區，對應細流中的「分區草圖」
+  var families = [
+    [0xc98a3d, 0xd9a050, 0xb87830, 0xe0b068],   // 赭黃
+    [0xa04a2a, 0x8e3d22, 0xb55a36, 0x7e3520],   // 鏽紅
+    [0x6b7a3a, 0x59682e, 0x7d8c4a, 0x4d5c28],   // 橄欖綠
+    [0x7e2f23, 0x6a261c, 0x923a2c, 0x5c2018],   // 深棗紅
+    [0xc4a36a, 0xd4b67e, 0xb29258, 0xa8865a],   // 淺褐
+    [0x8a6f3a, 0x9a7f48, 0x77602f, 0xa78d52]    // 茶棕
+  ];
+  var leafMats = {};
+  function leafMat(hex){
+    if(!leafMats[hex]){
+      leafMats[hex] = new THREE.MeshStandardMaterial({color:hex, roughness:0.85, metalness:0, side:THREE.DoubleSide});
+    }
+    return leafMats[hex];
+  }
+  // 葉形
+  var leafShape = new THREE.Shape();
+  leafShape.moveTo(0, 0);
+  leafShape.quadraticCurveTo(0.13, 0.10, 0.02, 0.34);
+  leafShape.quadraticCurveTo(0, 0.38, -0.02, 0.34);
+  leafShape.quadraticCurveTo(-0.13, 0.10, 0, 0);
+  var leafGeo = new THREE.ShapeGeometry(leafShape, 6);
+
+  var CX = 0, CY = 0.45;                 // 中心圖騰位置
+  var CLEAR_R = 1.12;                    // 中心留空半徑
+  var placed = 0, tries = 0;
+  while(placed < 460 && tries < 6000){
+    tries++;
+    var y = rand(-TOP, TOP);
+    var x = rand(-SW/2, SW/2);
+    if(inside(x, y, 0.16)){
+      var dx = x - CX, dy = y - CY;
+      if(Math.sqrt(dx*dx + dy*dy) > CLEAR_R){
+        var ang = Math.atan2(dx, dy);                       // -π..π
+        var sector = Math.floor(((ang + Math.PI) / (Math.PI*2)) * 6) % 6;
+        var color = pick(families[sector]);
+        var leaf = new THREE.Mesh(leafGeo, leafMat(color));
+        leaf.position.set(x, y, 0.02 + rand(0, 0.05));
+        leaf.rotation.z = rand(0, Math.PI*2);
+        leaf.rotation.x = rand(-0.35, 0.35);
+        leaf.rotation.y = rand(-0.35, 0.35);
+        var s = rand(0.8, 1.35);
+        leaf.scale.set(s, s, s);
+        leaf.castShadow = true;
+        leafGroup.add(leaf);
+        placed++;
+      }
+    }
+  }
+
+  // 散落的種子（小橢球）
+  var seedGeo = new THREE.SphereGeometry(0.045, 8, 6);
+  var seedMat = new THREE.MeshStandardMaterial({color:0x4a3622, roughness:0.7});
+  var seeds = 0; tries = 0;
+  while(seeds < 40 && tries < 1500){
+    tries++;
+    var sy = rand(-TOP, TOP), sx = rand(-SW/2, SW/2);
+    if(inside(sx, sy, 0.2)){
+      var sdx = sx - CX, sdy = sy - CY;
+      if(Math.sqrt(sdx*sdx + sdy*sdy) > CLEAR_R){
+        var seed = new THREE.Mesh(seedGeo, seedMat);
+        seed.position.set(sx, sy, 0.1);
+        seed.scale.set(1, rand(1.3, 1.8), 1);
+        seed.rotation.z = rand(0, Math.PI);
+        seed.castShadow = true;
+        leafGroup.add(seed);
+        seeds++;
+      }
+    }
+  }
+
+  // ---------- 3. 中心螺旋圖騰（細枝排列）+ 石頭環 ----------
+  var twigMat = new THREE.MeshStandardMaterial({color:0x5b4632, roughness:0.9});
+  var twigGeoSmall = new THREE.CylinderGeometry(0.022, 0.03, 1, 5);
+  var theta = 0.4, lastP = null;
+  while(theta < Math.PI * 4.6){
+    var r = 0.055 * theta;
+    var px = CX + r * Math.cos(theta);
+    var py = CY + r * Math.sin(theta);
+    var p = new THREE.Vector3(px, py, 0.12);
+    if(lastP){
+      var seg = new THREE.Vector3().subVectors(p, lastP);
+      var len = seg.length();
+      var twig = new THREE.Mesh(twigGeoSmall, twigMat);
+      twig.scale.y = len * 1.15;
+      twig.position.copy(lastP).add(seg.multiplyScalar(0.5));
+      twig.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), new THREE.Vector3().subVectors(p, lastP).normalize());
+      twig.castShadow = true;
+      centerGroup.add(twig);
+    }
+    lastP = p;
+    theta += 0.32;
+  }
+
+  // 石頭環
+  var stoneCols = [0x8d8a82, 0x7a766c, 0x9c988e, 0x6e6a60];
+  var i;
+  for(i = 0; i < 16; i++){
+    var sa = (i / 16) * Math.PI * 2;
+    var stoneGeo = new THREE.DodecahedronGeometry(rand(0.09, 0.14), 0);
+    var stone = new THREE.Mesh(stoneGeo, new THREE.MeshStandardMaterial({color:pick(stoneCols), roughness:0.95, flatShading:true}));
+    stone.position.set(CX + Math.cos(sa) * 0.98, CY + Math.sin(sa) * 0.98, 0.1);
+    stone.rotation.set(rand(0,3), rand(0,3), rand(0,3));
+    stone.scale.set(1, rand(0.7,1), rand(0.6,0.9));
+    stone.castShadow = true;
+    centerGroup.add(stone);
+  }
+
+  // ---------- 4. 樹枝邊框 ----------
+  var frameMatA = new THREE.MeshStandardMaterial({color:0x6a543c, roughness:0.92});
+  var frameMatB = new THREE.MeshStandardMaterial({color:0x4e3c2a, roughness:0.92});
+  var outline3 = [];
+  for(i = 0; i < outlinePts.length; i += 3){
+    outline3.push(new THREE.Vector3(outlinePts[i].x, outlinePts[i].y, 0.1));
+  }
+  for(i = 0; i < outline3.length; i++){
+    var a = outline3[i];
+    var b = outline3[(i+1) % outline3.length];
+    var dir = new THREE.Vector3().subVectors(b, a);
+    var segLen = dir.length();
+    if(segLen > 0.02 && segLen < 1.2){
+      var fg = new THREE.CylinderGeometry(rand(0.03,0.045), rand(0.035,0.05), 1, 6);
+      var ftwig = new THREE.Mesh(fg, (i % 2 === 0) ? frameMatA : frameMatB);
+      ftwig.scale.y = segLen * 1.25;
+      ftwig.position.copy(a).add(dir.clone().multiplyScalar(0.5));
+      ftwig.position.z += rand(-0.01, 0.03);
+      ftwig.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.normalize());
+      ftwig.rotation.z += rand(-0.04, 0.04);
+      ftwig.castShadow = true;
+      frameGroup.add(ftwig);
+    }
+  }
+
+  // 麻繩吊掛
+  var ropeCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-1.1, TOP - 0.05, 0),
+    new THREE.Vector3(0, TOP + 0.9, 0),
+    new THREE.Vector3(1.1, TOP - 0.05, 0)
+  ]);
+  var rope = new THREE.Mesh(new THREE.TubeGeometry(ropeCurve, 24, 0.035, 6, false),
+    new THREE.MeshStandardMaterial({color:0xb89a6a, roughness:1}));
+  rope.castShadow = true;
+  frameGroup.add(rope);
+
+  // ---------- 5. 旁陳之刀（陳列於盾右側） ----------
+  (function(){
+    // 雙層石頭展示底座
+    var standLower = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.62, 0.66, 0.08, 28),
+      new THREE.MeshStandardMaterial({color:0x3d3a32, roughness:0.95, flatShading:true})
+    );
+    standLower.position.y = -1.55;
+    standLower.castShadow = true; standLower.receiveShadow = true;
+    knifeGroup.add(standLower);
+
+    var standUpper = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.48, 0.52, 0.06, 24),
+      new THREE.MeshStandardMaterial({color:0x5a5650, roughness:0.95, flatShading:true})
+    );
+    standUpper.position.y = -1.48;
+    standUpper.castShadow = true; standUpper.receiveShadow = true;
+    knifeGroup.add(standUpper);
+
+    // 柄末木節 pommel
+    var pommel = new THREE.Mesh(
+      new THREE.SphereGeometry(0.13, 12, 8),
+      new THREE.MeshStandardMaterial({color:0x3a2b1c, roughness:0.85, flatShading:true})
+    );
+    pommel.position.y = -1.34;
+    pommel.scale.set(1, 0.85, 1);
+    pommel.castShadow = true;
+    knifeGroup.add(pommel);
+
+    // 柄（樹枝）
+    var handle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.095, 0.115, 1.0, 10),
+      new THREE.MeshStandardMaterial({color:0x4e3a26, roughness:0.92})
+    );
+    handle.position.y = -0.7;
+    handle.castShadow = true;
+    knifeGroup.add(handle);
+
+    // 麻繩纏繞（柄與刃接合處）
+    var ropeMat = new THREE.MeshStandardMaterial({color:0xb89a6a, roughness:1});
+    for(var ri = 0; ri < 7; ri++){
+      var ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.125, 0.020, 6, 18),
+        ropeMat
+      );
+      ring.position.y = -0.32 + ri * 0.045;
+      ring.rotation.x = Math.PI / 2;
+      ring.rotation.z = ri * 0.4;
+      ring.castShadow = true;
+      knifeGroup.add(ring);
+    }
+
+    // 石刃（燧石敲擊風格，flat shading）
+    var bladeShape = new THREE.Shape();
+    bladeShape.moveTo(-0.14, 0);
+    bladeShape.lineTo(-0.18, 0.18);
+    bladeShape.lineTo(-0.20, 0.40);
+    bladeShape.lineTo(-0.17, 0.65);
+    bladeShape.lineTo(-0.11, 0.90);
+    bladeShape.lineTo(-0.04, 1.08);
+    bladeShape.lineTo(0.02, 1.16);
+    bladeShape.lineTo(0.08, 1.05);
+    bladeShape.lineTo(0.15, 0.85);
+    bladeShape.lineTo(0.19, 0.58);
+    bladeShape.lineTo(0.20, 0.32);
+    bladeShape.lineTo(0.16, 0.12);
+    bladeShape.lineTo(0.13, 0);
+    bladeShape.lineTo(-0.14, 0);
+    var bladeGeo = new THREE.ExtrudeGeometry(bladeShape, {
+      depth: 0.05, bevelEnabled: true,
+      bevelThickness: 0.022, bevelSize: 0.022, bevelSegments: 2
+    });
+    bladeGeo.translate(0, 0, -0.025);
+    var blade = new THREE.Mesh(bladeGeo, new THREE.MeshStandardMaterial({
+      color: 0x6a6f65, roughness: 0.55, metalness: 0.10, flatShading: true
+    }));
+    blade.position.y = -0.05;
+    blade.castShadow = true;
+    knifeGroup.add(blade);
+
+    // 柄上掛一片葉（與盾呼應）
+    var decoLeafShape = new THREE.Shape();
+    decoLeafShape.moveTo(0, 0);
+    decoLeafShape.quadraticCurveTo(0.11, 0.09, 0.018, 0.30);
+    decoLeafShape.quadraticCurveTo(0, 0.34, -0.018, 0.30);
+    decoLeafShape.quadraticCurveTo(-0.11, 0.09, 0, 0);
+    var decoLeaf = new THREE.Mesh(
+      new THREE.ShapeGeometry(decoLeafShape, 6),
+      new THREE.MeshStandardMaterial({color: 0x6b7a3a, roughness: 0.85, side: THREE.DoubleSide})
+    );
+    decoLeaf.position.set(0.16, -0.55, 0.14);
+    decoLeaf.rotation.set(0.25, 0.35, -0.7);
+    decoLeaf.castShadow = true;
+    knifeGroup.add(decoLeaf);
+  })();
+
+  // ---------- 牆面（接收影子） ----------
+  var wall = new THREE.Mesh(new THREE.PlaneGeometry(40, 40),
+    new THREE.MeshStandardMaterial({color:0x232b1f, roughness:1}));
+  wall.position.z = -1.2;
+  wall.receiveShadow = true;
+  scene.add(wall);
+
+  // ---------- 互動：拖曳旋轉、縮放、按鈕 ----------
+  var targetRX = 0, targetRY = 0, autoSpin = true, exploded = false;
+  var dragging = false, lastX = 0, lastY = 0, pinchDist = 0;
+
+  function onDown(x, y){ dragging = true; lastX = x; lastY = y; }
+  function onMove(x, y){
+    if(dragging){
+      targetRY += (x - lastX) * 0.006;
+      targetRX += (y - lastY) * 0.006;
+      targetRX = Math.max(-1.1, Math.min(1.1, targetRX));
+      lastX = x; lastY = y;
+    }
+  }
+  renderer.domElement.addEventListener('mousedown', function(e){ onDown(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', function(e){ onMove(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', function(){ dragging = false; });
+  renderer.domElement.addEventListener('touchstart', function(e){
+    if(e.touches.length === 1){ onDown(e.touches[0].clientX, e.touches[0].clientY); }
+    else if(e.touches.length === 2){
+      dragging = false;
+      pinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    }
+  }, {passive:true});
+  renderer.domElement.addEventListener('touchmove', function(e){
+    if(e.touches.length === 1){ onMove(e.touches[0].clientX, e.touches[0].clientY); }
+    else if(e.touches.length === 2){
+      var d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      camDist = Math.max(6, Math.min(18, camDist * (pinchDist / d)));
+      pinchDist = d;
+    }
+  }, {passive:true});
+  window.addEventListener('touchend', function(){ dragging = false; });
+  renderer.domElement.addEventListener('wheel', function(e){
+    e.preventDefault();
+    camDist = Math.max(6, Math.min(18, camDist + e.deltaY * 0.008));
+  }, {passive:false});
+
+  var btnSpin = document.getElementById('btnSpin');
+  var btnExplode = document.getElementById('btnExplode');
+  var btnCard = document.getElementById('btnCard');
+  var btnReset = document.getElementById('btnReset');
+  var card = document.getElementById('card');
+
+  btnSpin.addEventListener('click', function(){
+    autoSpin = !autoSpin;
+    btnSpin.classList.toggle('on', autoSpin);
+  });
+  btnExplode.addEventListener('click', function(){
+    exploded = !exploded;
+    btnExplode.classList.toggle('on', exploded);
+  });
+  btnCard.addEventListener('click', function(){
+    card.classList.toggle('show');
+    btnCard.classList.toggle('on', card.classList.contains('show'));
+  });
+  btnReset.addEventListener('click', function(){
+    targetRX = 0; targetRY = 0; camDist = 11.8;
+    exploded = false; btnExplode.classList.remove('on');
+  });
+
+  window.addEventListener('resize', function(){
+    W = window.innerWidth; H = window.innerHeight;
+    camera.aspect = W/H; camera.updateProjectionMatrix();
+    renderer.setSize(W, H);
+  });
+
+  // ---------- 動畫迴圈 ----------
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var clock = new THREE.Clock();
+  function lerp(a, b, t){ return a + (b - a) * t; }
+
+  function animate(){
+    requestAnimationFrame(animate);
+    var t = clock.getElapsedTime();
+
+    if(autoSpin && !dragging && !reduceMotion){ targetRY += 0.0022; }
+    pivot.rotation.y = lerp(pivot.rotation.y, targetRY, 0.08);
+    pivot.rotation.x = lerp(pivot.rotation.x, targetRX, 0.08);
+    if(!reduceMotion){ pivot.position.y = Math.sin(t * 0.8) * 0.05; }
+
+    // 分層檢視：底板 → 葉片層 → 中心圖騰 → 邊框
+    var ez = exploded ? 1 : 0;
+    leafGroup.position.z   = lerp(leafGroup.position.z,   ez * 0.9, 0.07);
+    centerGroup.position.z = lerp(centerGroup.position.z, ez * 1.8, 0.07);
+    frameGroup.position.z  = lerp(frameGroup.position.z,  ez * 2.7, 0.07);
+
+    camera.position.z = lerp(camera.position.z, camDist, 0.1);
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+</script>
+</body>
+</html>
