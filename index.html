@@ -68,7 +68,7 @@
 <div class="hud" id="card">
   <h2>作品理念</h2>
   <div class="en">Concept</div>
-  <p>以校園可見的自然素材——落葉、細枝、石礫與種子——拼貼成盾；旁列以燧石、樹枝、麻繩組成相伴之刀。刀與盾並列，象徵自然同時是守護生命的盾，也是生存所用的工具。</p>
+  <p>以校園可見的自然素材——落葉、細枝、石礫與種子——拼貼成盾；旁列以燧石、樹枝、麻繩組成相伴之刀。刀與盾並列，象徵自然同時是守護生命[...]
   <p class="en-body">A shield and an accompanying knife, both assembled from natural materials. Nature is at once the protector and the tool of survival — leaf and stone, twig and bone.</p>
   <div class="team">隊員｜曾筠翔・胡澤宇・羅盛揚</div>
 </div>
@@ -486,7 +486,7 @@
   });
 
   // ---------- 動畫迴圈 ----------
-  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var reduceMotion = false;
   var clock = new THREE.Clock();
   function lerp(a, b, t){ return a + (b - a) * t; }
 
